@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distribuidoras de Drones – México</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; }
+  #header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white; padding: 14px 20px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 2px solid #0f3460;
+  }
+  #header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  #header p { font-size: 12px; color: #8899aa; margin-top: 2px; }
+  #map { height: calc(100vh - 60px); width: 100%; }
+  .legend {
+    background: rgba(255,255,255,0.95);
+    padding: 12px 16px; border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    font-size: 13px; min-width: 180px;
+  }
+  .legend h4 { margin-bottom: 10px; font-size: 13px; font-weight: 700; color: #1a1a2e; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+  .legend-item { display: flex; align-items: center; margin-bottom: 7px; gap: 8px; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); flex-shrink: 0; }
+  .legend-text { color: #333; font-size: 12px; }
+  .legend-count { margin-left: auto; background: #f0f0f0; border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 600; color: #555; }
+  #stats {
+    position: absolute; top: 70px; right: 10px; z-index: 1000;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.93); border-radius: 8px;
+    padding: 8px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    font-size: 12px; text-align: center; min-width: 130px;
+  }
+  .stat-card .num { font-size: 22px; font-weight: 800; }
+  .stat-card .lbl { color: #666; font-size: 10px; margin-top: 1px; }
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1>🛸 Distribuidoras de Drones – República Mexicana</h1>
+    <p>Puntos georeferenciados por municipio · 3 Zonas comerciales</p>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+const map = L.map('map', { center: [23.5, -102.5], zoom: 5 });
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CartoDB',
+  maxZoom: 18
+}).addTo(map);
+
+// Zona 1: Verde (#22c55e) – Sinaloa, Sonora, BC, BCS
+// Zona 2: Rojo (#ef4444) – Chihuahua, Coahuila, Durango, Zacatecas, Aguascalientes, Jalisco, Michoacán, Colima, Nayarit
+// Zona 3: Azul (#3b82f6) – Resto del país
+
+const ZONA_COLORS = { 1: '#22c55e', 2: '#ef4444', 3: '#3b82f6' };
+const ZONA_NAMES  = { 1: 'Zona 1', 2: 'Zona 2', 3: 'Zona 3' };
+
+const empresas = [
+  // ZONA 1 – Sinaloa, Sonora, BC, BCS
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Ensenada, Baja California', lat: 31.8676, lng: -116.5960, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Mexicali, Baja California', lat: 32.6245, lng: -115.4523, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Caborca, Sonora', lat: 30.7127, lng: -112.1448, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Hermosillo, Sonora', lat: 29.0729, lng: -110.9559, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Hermosillo, Sonora', lat: 29.0929, lng: -110.9759, zona: 1 },
+  { empresa: 'DISTRIBUIDORA BIOBAJA SA DE CV', ubicacion: 'Cd. Constitución, BCS', lat: 25.0393, lng: -111.6642, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Cd. Obregón, Sonora', lat: 27.4863, lng: -109.9400, zona: 1 },
+  { empresa: 'EMPRESAS MATCO S.A. DE C.V.', ubicacion: 'Cd. Obregón, Sonora', lat: 27.5063, lng: -109.9600, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Navojoa, Sonora', lat: 27.0775, lng: -109.4445, zona: 1 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Huatabampo, Sonora', lat: 26.8201, lng: -109.6429, zona: 1 },
+  { empresa: 'BRAULIA MARIA DELGADO RAMOS', ubicacion: 'Culiacán, Sinaloa', lat: 24.8049, lng: -107.3940, zona: 1 },
+  { empresa: 'Aquila', ubicacion: 'Culiacán, Sinaloa', lat: 24.8149, lng: -107.4040, zona: 1 },
+  { empresa: 'Loftech', ubicacion: 'Guasave, Sinaloa', lat: 25.5665, lng: -108.4689, zona: 1 },
+  { empresa: 'UBIAGRO', ubicacion: 'Los Mochis, Sinaloa', lat: 25.7863, lng: -108.9957, zona: 1 },
+  { empresa: 'Maquinaria del Humaya', ubicacion: 'Navolato, Sinaloa', lat: 24.7674, lng: -107.7001, zona: 1 },
+  { empresa: 'RHTech', ubicacion: 'Navolato, Sinaloa', lat: 24.7874, lng: -107.7201, zona: 1 },
+  { empresa: 'SITEHAS A', ubicacion: 'El Rosario, Sinaloa', lat: 22.9901, lng: -105.8542, zona: 1 },
+  { empresa: 'Agratech', ubicacion: 'Hermosillo, Sonora', lat: 29.0829, lng: -110.9459, zona: 1 },
+  { empresa: 'Maquinaria Frontera', ubicacion: 'Hermosillo, Sonora', lat: 29.0629, lng: -110.9659, zona: 1 },
+  { empresa: 'SITECH', ubicacion: 'Hermosillo, Sonora', lat: 29.0529, lng: -110.9559, zona: 1 },
+  { empresa: 'Equipos Agrícolas del Yaqui (EAYSA)', ubicacion: 'Navojoa – Cd. Obregón, Sonora', lat: 27.2500, lng: -109.7000, zona: 1 },
+  { empresa: 'Loftech', ubicacion: 'Baja California Sur', lat: 24.1426, lng: -110.3128, zona: 1 },
+  { empresa: 'SITECH', ubicacion: 'Baja California Sur', lat: 24.1626, lng: -110.2928, zona: 1 },
+  { empresa: 'Maquinaria Frontera', ubicacion: 'Baja California', lat: 30.8406, lng: -115.2838, zona: 1 },
+  { empresa: 'Agratech', ubicacion: 'Baja California', lat: 30.8606, lng: -115.3038, zona: 1 },
+  { empresa: 'SITECH', ubicacion: 'Baja California', lat: 30.8006, lng: -115.2638, zona: 1 },
+
+  // ZONA 2 – Chihuahua, Coahuila, Durango, Zacatecas, Aguascalientes, Jalisco, Michoacán, Colima, Nayarit
+  { empresa: 'GANADERIA GILIO DEL NORTE S.A. DE C.V.', ubicacion: 'Gómez Palacio, Durango', lat: 25.5688, lng: -103.4988, zona: 2 },
+  { empresa: 'ASPERSORAS Y MOTOIMPLEMENTOS DE DELICIAS', ubicacion: 'Delicias, Chihuahua', lat: 28.1888, lng: -105.4759, zona: 2 },
+  { empresa: 'AGRIFORCE SA DE CV', ubicacion: 'Nava, Coahuila', lat: 28.4235, lng: -100.7672, zona: 2 },
+  { empresa: 'LAMSA', ubicacion: 'Torreón, Coahuila', lat: 25.5428, lng: -103.4068, zona: 2 },
+  { empresa: 'LAMSA', ubicacion: 'Durango, Dgo.', lat: 24.0277, lng: -104.6532, zona: 2 },
+  { empresa: 'LAMSA', ubicacion: 'Fresnillo, Zacatecas', lat: 23.1759, lng: -102.8720, zona: 2 },
+  { empresa: 'COMERCIALIZADORA LA CIENEGA S.A. DE C.V.', ubicacion: 'Jamay, Jalisco', lat: 20.2945, lng: -102.7159, zona: 2 },
+  { empresa: 'AGROTRACTORES DE LA CIENEGA S.A. DE C.V.', ubicacion: 'La Barca, Jalisco', lat: 20.2845, lng: -102.5572, zona: 2 },
+  { empresa: 'AGRICOLA AUTOMOTRIZ DEL CENTRO S.A DE C.V', ubicacion: 'La Barca, Jalisco', lat: 20.3045, lng: -102.5772, zona: 2 },
+  { empresa: 'TUDRON', ubicacion: 'Ocotlán, Jalisco', lat: 20.3527, lng: -102.7699, zona: 2 },
+  { empresa: 'AGRICOLA AUTOMOTRIZ DEL CENTRO S.A DE C.V', ubicacion: 'Jacona, Michoacán', lat: 19.9358, lng: -102.2866, zona: 2 },
+  { empresa: 'AGRICOLA DEL VALLE DE ZAMORA S.A. DE R.L.M.I.', ubicacion: 'Zamora, Michoacán', lat: 19.9841, lng: -102.2833, zona: 2 },
+  { empresa: 'AGRICOLA AUTOMOTRIZ DEL CENTRO S.A DE C.V', ubicacion: 'La Piedad, Michoacán', lat: 20.3468, lng: -102.0198, zona: 2 },
+  { empresa: 'EQUIPOS AGRICOLAS E INDUSTRIALES S.A DE C.V', ubicacion: 'Morelia, Michoacán', lat: 19.7060, lng: -101.1950, zona: 2 },
+  { empresa: 'EQUIPOS AGRICOLAS DE OCCIDENTE S.A. DE C.V.', ubicacion: 'San José de la Trinidad, Michoacán', lat: 20.0000, lng: -101.6000, zona: 2 },
+
+  // ZONA 3 – Resto del país
+  { empresa: 'NDÚSTRIAL AGRICOLA DE MONTERREY', ubicacion: 'Montemorelos, Nuevo León', lat: 25.1908, lng: -99.8275, zona: 3 },
+  { empresa: 'INDUSTRIAL AGRICOLA DE MONTERREY', ubicacion: 'Montemorelos, Nuevo León', lat: 25.2108, lng: -99.8475, zona: 3 },
+  { empresa: 'COMERCIALIZADORA SAN GERMAN SA DE CV', ubicacion: 'Cd. Victoria, Tamaulipas', lat: 23.7369, lng: -99.1411, zona: 3 },
+  { empresa: 'AGROEQUIPOS TAMAULIPAS', ubicacion: 'Cd. Victoria, Tamaulipas', lat: 23.7569, lng: -99.1611, zona: 3 },
+  { empresa: 'AGEBSA', ubicacion: 'Matamoros, Tamaulipas', lat: 25.8692, lng: -97.5027, zona: 3 },
+  { empresa: 'AGEBSA', ubicacion: 'Río Bravo, Tamaulipas', lat: 25.9883, lng: -98.0862, zona: 3 },
+  { empresa: 'AGEBSA', ubicacion: 'Valle Hermoso, Tamaulipas', lat: 25.6736, lng: -97.8181, zona: 3 },
+  { empresa: 'FLIZA', ubicacion: 'Tamaulipas', lat: 24.2000, lng: -98.8000, zona: 3 },
+  { empresa: 'AGROBALSAS', ubicacion: 'Cd. Victoria, Tamaulipas', lat: 23.7269, lng: -99.1511, zona: 3 },
+  { empresa: 'INTER RURAL', ubicacion: 'El Mante, Tamaulipas', lat: 22.7435, lng: -98.9711, zona: 3 },
+  { empresa: 'LAMSA', ubicacion: 'Cd. Valles, SLP', lat: 21.9982, lng: -99.0176, zona: 3 },
+  { empresa: 'MAXIDRON', ubicacion: 'Ciudad Valles, SLP', lat: 22.0082, lng: -99.0376, zona: 3 },
+  { empresa: 'MAXIDRON', ubicacion: 'Ciudad Valles, SLP', lat: 22.0282, lng: -99.0576, zona: 3 },
+  { empresa: 'LA HUASTECA', ubicacion: 'Ciudad Valles, SLP', lat: 21.9882, lng: -99.0276, zona: 3 },
+  { empresa: 'FAMAQ | IMPLEMENTOS AGRICOLAS', ubicacion: 'Guanajuato, Gto.', lat: 21.0190, lng: -101.2574, zona: 3 },
+  { empresa: 'COMERCIALIZADORA AGROBUSINES S DE PR DE RL', ubicacion: 'Manuel Doblado, Gto.', lat: 20.7289, lng: -101.9517, zona: 3 },
+  { empresa: 'FERRE ACEROS DE DOBLADO S.A. DE C.V.', ubicacion: 'Manuel Doblado, Gto.', lat: 20.7489, lng: -101.9717, zona: 3 },
+  { empresa: 'MARAGUI', ubicacion: 'Manuel Doblado, Gto.', lat: 20.7089, lng: -101.9317, zona: 3 },
+  { empresa: 'ANA ELENA CISNEROS VELAZQUEZ', ubicacion: 'Irapuato, Gto.', lat: 20.6737, lng: -101.3496, zona: 3 },
+  { empresa: 'AGROEQUIPOS HV SPR DE RL DE CV', ubicacion: 'Pénjamo, Gto.', lat: 20.4275, lng: -101.7224, zona: 3 },
+  { empresa: 'AGROEQUIPOS DE ABASOLO S.A. DE C.V.', ubicacion: 'Abasolo, Gto.', lat: 20.4485, lng: -101.5271, zona: 3 },
+  { empresa: 'AGRICOLA AUTOMOTRIZ DEL CENTRO S.A DE C.V', ubicacion: 'Irapuato, Gto.', lat: 20.6937, lng: -101.3696, zona: 3 },
+  { empresa: 'IMPAGTA', ubicacion: 'Celaya, Gto.', lat: 20.5233, lng: -100.8152, zona: 3 },
+  { empresa: 'Ingeniería GPS', ubicacion: 'Irapuato, Gto.', lat: 20.6837, lng: -101.3596, zona: 3 },
+  { empresa: 'EQUIPOS Y TRACTORES DEL BAJIO S.A DE C.V', ubicacion: 'Celaya, Gto.', lat: 20.5433, lng: -100.8352, zona: 3 },
+  { empresa: 'CESAR EDUARDO RODRIGUEZ MIRANDA', ubicacion: 'Celaya, Gto.', lat: 20.5133, lng: -100.8252, zona: 3 },
+  { empresa: 'COMERCIALIZADORA DE REFACCIONES EL MOLINO', ubicacion: 'Salvatierra, Gto.', lat: 20.2129, lng: -100.8864, zona: 3 },
+  { empresa: 'ETBSA', ubicacion: 'Guanajuato, Gto.', lat: 21.0090, lng: -101.2574, zona: 3 },
+  { empresa: 'SOLUCIONES UAV', ubicacion: 'Irapuato, Gto.', lat: 20.6537, lng: -101.3296, zona: 3 },
+  { empresa: 'AGROTRACTORES DEL CENTRO S.A. DE C.V.', ubicacion: 'El Marqués, Qro.', lat: 20.8756, lng: -100.1914, zona: 3 },
+  { empresa: 'BOMBAS Y AFOROS DE QUERETARO S.A. DE C.V.', ubicacion: 'El Marqués, Qro.', lat: 20.8556, lng: -100.1714, zona: 3 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'Querétaro, Qro.', lat: 20.5888, lng: -100.3899, zona: 3 },
+  { empresa: 'HELIBOS', ubicacion: 'Querétaro, Qro.', lat: 20.5688, lng: -100.3699, zona: 3 },
+  { empresa: 'OMEGA DRONE', ubicacion: 'Querétaro, Qro.', lat: 20.5788, lng: -100.3799, zona: 3 },
+  { empresa: 'MAQUINALIKA', ubicacion: 'Pedro Escobedo, Qro.', lat: 20.4836, lng: -100.1399, zona: 3 },
+  { empresa: 'OTECH', ubicacion: 'Pedro Escobedo, Qro.', lat: 20.4636, lng: -100.1199, zona: 3 },
+  { empresa: 'ALFONSO R. BOURS S.A DE C.V.', ubicacion: 'San Juan del Río, Qro.', lat: 20.3877, lng: -99.9958, zona: 3 },
+  { empresa: 'AMX', ubicacion: 'Apan, Hidalgo', lat: 19.7104, lng: -98.4548, zona: 3 },
+  { empresa: 'GIMTRAC', ubicacion: 'Pachuca, Hidalgo', lat: 20.1011, lng: -98.7591, zona: 3 },
+  { empresa: 'EQUIPARTES AGRICOLAS S.A. DE C.V.', ubicacion: 'Toluca, Edo. Méx.', lat: 19.2826, lng: -99.6557, zona: 3 },
+  { empresa: 'DISTRIBUIDORA DE MAQUINARIA JM S.A. DE C.V.', ubicacion: 'Toluca, Edo. Méx.', lat: 19.3026, lng: -99.6757, zona: 3 },
+  { empresa: 'EQUIPOS AGRICOLAS DE XALCO S.A. DE C.V.', ubicacion: 'Chalco, Edo. Méx.', lat: 19.2626, lng: -98.8982, zona: 3 },
+  { empresa: 'AGROINDUSTRIAS RAIKER', ubicacion: 'Tlalnepantla, Edo. Méx.', lat: 19.5406, lng: -99.2052, zona: 3 },
+  { empresa: 'AGROQUIMICOS DEL NORTE', ubicacion: 'Atlacomulco, Edo. Méx.', lat: 19.7976, lng: -99.8773, zona: 3 },
+  { empresa: 'ASPERSORAS Y REFACCIONES S.A DE C.V.', ubicacion: 'Cuautla, Morelos', lat: 18.8123, lng: -98.9483, zona: 3 },
+  { empresa: 'EQUIPOS MONTENEGRO S.A. DE C.V.', ubicacion: 'Cuautla, Morelos', lat: 18.8323, lng: -98.9683, zona: 3 },
+  { empresa: 'AGRODRONE', ubicacion: 'Yautepec, Morelos', lat: 18.8869, lng: -99.0703, zona: 3 },
+  { empresa: 'HELIBOS', ubicacion: 'Puebla', lat: 19.0414, lng: -98.2063, zona: 3 },
+  { empresa: 'PROYECTOS AGRODINAMICOS', ubicacion: 'Amozoc, Puebla', lat: 19.0503, lng: -97.9758, zona: 3 },
+  { empresa: 'SCORPION DRONES', ubicacion: 'Atlixco, Puebla', lat: 18.9063, lng: -98.4374, zona: 3 },
+  { empresa: 'GARAY', ubicacion: 'Heroica Puebla de Zaragoza', lat: 19.0614, lng: -98.2263, zona: 3 },
+  { empresa: 'TUDRON', ubicacion: 'Puebla', lat: 19.0214, lng: -98.2163, zona: 3 },
+  { empresa: 'DAVID DAMIAN CANELA MENDEZ', ubicacion: 'Perote, Veracruz', lat: 19.5697, lng: -97.2436, zona: 3 },
+  { empresa: 'VERASA', ubicacion: 'Perote, Veracruz', lat: 19.5897, lng: -97.2636, zona: 3 },
+  { empresa: 'DISTRIBUIDORA DE TRACTORES DE TABASCO SA DE CV', ubicacion: 'H. Cárdenas, Tabasco', lat: 17.9924, lng: -93.3724, zona: 3 },
+  { empresa: 'CIA AGRICOLA GANADERA DE TABASCO S.A. DE C.V.', ubicacion: 'Villahermosa, Tabasco', lat: 17.9898, lng: -92.9464, zona: 3 },
+  { empresa: 'AGRO EQUIPOS S.A DE C.V.', ubicacion: 'Tuxtla Gutiérrez, Chiapas', lat: 16.7521, lng: -93.1158, zona: 3 },
+  { empresa: 'HOBBYTUXTLA', ubicacion: 'Tuxtla Gutiérrez, Chiapas', lat: 16.7321, lng: -93.0958, zona: 3 },
+  { empresa: 'AGRO EQUIPOS S.A DE C.V.', ubicacion: 'Tapachula, Chiapas', lat: 14.8991, lng: -92.2626, zona: 3 },
+  { empresa: 'MERCAGRI', ubicacion: 'Tapachula, Chiapas', lat: 14.9191, lng: -92.2826, zona: 3 },
+  { empresa: 'COMERCIALIZADORA EL SURCO S.A. DE C.V.', ubicacion: 'Campeche, Camp.', lat: 19.8301, lng: -90.5349, zona: 3 },
+  { empresa: 'KIOTY', ubicacion: 'Hopelchén, Campeche', lat: 19.7461, lng: -89.8445, zona: 3 },
+  { empresa: 'NOHOL', ubicacion: 'Escárcega, Campeche', lat: 18.6051, lng: -90.7346, zona: 3 },
+  { empresa: 'DISTRIBUIDORA MEGAMAK S.A. DE C.V.', ubicacion: 'Mérida, Yucatán', lat: 20.9674, lng: -89.5928, zona: 3 },
+  { empresa: 'DAPSA', ubicacion: 'Mérida, Yucatán', lat: 20.9874, lng: -89.6128, zona: 3 },
+  { empresa: 'PAKA MOTORS', ubicacion: 'San Juan Bautista Tuxtepec, Oaxaca', lat: 18.0851, lng: -96.1218, zona: 3 },
+  { empresa: 'RIXUI COMERCIALIZADORA', ubicacion: 'San Pablo Huixtepec, Oaxaca', lat: 16.9095, lng: -96.7921, zona: 3 },
+  { empresa: 'TRACTOSUR', ubicacion: 'Juchitán de Zaragoza, Oaxaca', lat: 16.4344, lng: -95.0213, zona: 3 },
+];
+
+function makeIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+    <circle cx="11" cy="11" r="9" fill="${color}" stroke="white" stroke-width="2.5" opacity="0.92"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg, className: '', iconSize: [22,22], iconAnchor: [11,11], popupAnchor: [0,-12]
+  });
+}
+
+const counts = {1:0, 2:0, 3:0};
+
+empresas.forEach(e => {
+  counts[e.zona]++;
+  const color = ZONA_COLORS[e.zona];
+  const marker = L.marker([e.lat, e.lng], { icon: makeIcon(color) });
+  marker.bindPopup(`
+    <div style="font-family:'Segoe UI',Arial,sans-serif;min-width:200px">
+      <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:6px">${e.empresa}</div>
+      <div style="font-size:12px;color:#555;margin-bottom:8px">📍 ${e.ubicacion}</div>
+      <div style="display:inline-block;background:${color};color:white;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600">
+        ${ZONA_NAMES[e.zona]}
+      </div>
+    </div>
+  `, { maxWidth: 260 });
+  marker.addTo(map);
+});
+
+// Legend
+const legend = L.control({ position: 'bottomleft' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `
+    <h4>Zonas Comerciales</h4>
+    ${[1,2,3].map(z => `
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${ZONA_COLORS[z]}"></div>
+        <div class="legend-text"><b>${ZONA_NAMES[z]}</b><br><span style="font-size:10px;color:#777">${
+          z===1 ? 'Sinaloa, Sonora, BC, BCS' : z===2 ? 'Chih., Coah., Dgo., Zac., Jal., Mich., Nay.' : 'Resto del país'
+        }</span></div>
+        <span class="legend-count">${counts[z]}</span>
+      </div>`).join('')}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:11px;color:#888">
+      Total: <b>${empresas.length}</b> distribuidoras
+    </div>
+  `;
+  return div;
+};
+legend.addTo(map);
+</script>
+</body>
+</html>
